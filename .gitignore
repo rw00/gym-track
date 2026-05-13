@@ -1,0 +1,6 @@
+.env
+node_modules/
+*db.json
+cookie.txt
+sessions/
+check-in-history.pdf

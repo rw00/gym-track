@@ -1,0 +1,12 @@
+node_modules
+.git
+.github
+.env
+.env.*
+*db.json
+cookie.txt
+sessions
+examples
+check-in-history.pdf
+test
+npm-debug.log*

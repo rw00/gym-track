@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta
+            name="viewport"
+            content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+        <title>GymTrack</title>
+        <meta
+            name="description"
+            content="Upload and analyze your gym check-in PDF history, workout durations, and discount calculations." />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="192x192"
+            href="images/icon-192.png" />
+        <link rel="apple-touch-icon" href="images/icon-192.png" />
+        <link rel="stylesheet" href="styles.css" />
+        <link rel="manifest" href="manifest.json" />
+        <meta name="theme-color" content="#0b0f19" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+            rel="stylesheet" />
+    </head>
+
+    <body>
+        <div id="app">
+            <!-- App Navigation Bar (Visible After Login) -->
+            <nav id="app-nav" class="app-nav hidden">
+                <div class="brand">
+                    <span class="brand-name">GymTrack</span>
+                </div>
+                <div class="nav-actions desktop-nav">
+                    <button
+                        id="nav-report-btn"
+                        class="nav-pill active"
+                        data-nav="report">
+                        Report
+                    </button>
+                    <button
+                        id="nav-history-btn"
+                        class="nav-pill"
+                        data-nav="history">
+                        DB History
+                    </button>
+                    <button id="nav-live-btn" class="nav-pill" data-nav="live">
+                        Live Tracker
+                    </button>
+                    <button
+                        id="nav-logout-btn"
+                        class="nav-pill nav-pill-logout">
+                        Logout
+                    </button>
+                </div>
+                <button
+                    id="nav-hamburger-btn"
+                    class="hamburger-btn"
+                    aria-label="Toggle navigation menu"
+                    aria-expanded="false">
+                    <span class="hamburger-bar"></span>
+                    <span class="hamburger-bar"></span>
+                    <span class="hamburger-bar"></span>
+                </button>
+                <div id="mobile-nav-menu" class="mobile-nav-menu hidden">
+                    <button
+                        id="mobile-nav-report-btn"
+                        class="mobile-nav-item active"
+                        data-nav="report">
+                        <svg
+                            class="mobile-nav-icon"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path
+                                d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                            <polyline points="14 2 14 8 20 8"></polyline>
+                            <line x1="16" y1="13" x2="8" y2="13"></line>
+                            <line x1="16" y1="17" x2="8" y2="17"></line>
+                        </svg>
+                        <span>Report</span>
+                    </button>
+                    <button
+                        id="mobile-nav-history-btn"
+                        class="mobile-nav-item"
+                        data-nav="history">
+                        <svg
+                            class="mobile-nav-icon"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <rect
+                                x="3"
+                                y="4"
+                                width="18"
+                                height="18"
+                                rx="2"
+                                ry="2"></rect>
+                            <line x1="16" y1="2" x2="16" y2="6"></line>
+                            <line x1="8" y1="2" x2="8" y2="6"></line>
+                            <line x1="3" y1="10" x2="21" y2="10"></line>
+                        </svg>
+                        <span>DB History</span>
+                    </button>
+                    <button
+                        id="mobile-nav-live-btn"
+                        class="mobile-nav-item"
+                        data-nav="live">
+                        <svg
+                            class="mobile-nav-icon"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <polyline points="12 6 12 12 16 14"></polyline>
+                        </svg>
+                        <span>Live Tracker</span>
+                    </button>
+                    <div class="mobile-nav-divider"></div>
+                    <button
+                        id="mobile-nav-logout-btn"
+                        class="mobile-nav-item mobile-nav-logout">
+                        <svg
+                            class="mobile-nav-icon"
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            stroke-width="2"
+                            stroke-linecap="round"
+                            stroke-linejoin="round">
+                            <path
+                                d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        <span>Logout</span>
+                    </button>
+                </div>
+            </nav>
+
+            <!-- Report View (Landing Page After Login) -->
+            <main id="report-view" class="view hidden">
+                <section id="pdf-hero" class="hero-section">
+                    <h1 class="hero-title">Gym Check-in Report</h1>
+                    <p class="hero-subtitle">
+                        Upload your check-in PDF to view attendance and
+                        discounts.
+                    </p>
+                </section>
+
+                <!-- PDF Dropzone Card -->
+                <div id="dropzone-card" class="card dropzone-card">
+                    <div id="pdf-dropzone" class="dropzone" tabindex="0">
+                        <input
+                            type="file"
+                            id="pdf-file-input"
+                            accept=".pdf,application/pdf"
+                            class="file-input" />
+                        <div class="dropzone-content">
+                            <div class="dropzone-icon">📄</div>
+                            <h3 class="dropzone-title">Upload Check-in PDF</h3>
+                            <p class="dropzone-desc">
+                                Drag & drop or
+                                <span class="browse-link">browse</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <div id="upload-status" class="upload-status hidden">
+                        <div class="loader"></div>
+                        <p id="upload-status-text">
+                            Processing check-in records...
+                        </p>
+                    </div>
+                    <div id="upload-error" class="error-msg hidden"></div>
+                </div>
+
+                <!-- Report Container (injected when processed) -->
+                <section id="report-container" class="report-section hidden">
+                    <!-- Cycles Toolbar -->
+                    <div class="cycles-toolbar">
+                        <div>
+                            <h2 class="section-title" id="cycles-section-title">
+                                Last 3 Cycles
+                            </h2>
+                        </div>
+                        <div class="toolbar-actions">
+                            <button
+                                id="new-upload-btn"
+                                class="btn-text"
+                                type="button">
+                                + Upload another PDF
+                            </button>
+                            <button
+                                id="toggle-all-details-btn"
+                                class="btn-text">
+                                Expand All Details
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- List of Cycles -->
+                    <div id="cycles-list" class="cycles-list">
+                        <!-- Cycle cards injected dynamically -->
+                    </div>
+                </section>
+            </main>
+
+            <!-- Login View (Initial Landing View for Unauthenticated Users) -->
+            <div id="login-view" class="view">
+                <div class="card auth-card">
+                    <div class="auth-header">
+                        <h1>GymTrack</h1>
+                        <p class="subtitle">Please login to continue</p>
+                    </div>
+                    <form id="login-form">
+                        <div class="input-group">
+                            <label for="username">Username</label>
+                            <input
+                                type="text"
+                                id="username"
+                                placeholder="Username"
+                                autocomplete="username"
+                                required />
+                        </div>
+                        <div class="input-group">
+                            <label for="password">Password</label>
+                            <input
+                                type="password"
+                                id="password"
+                                placeholder="Password"
+                                autocomplete="current-password"
+                                required />
+                        </div>
+                        <button type="submit" class="btn btn-primary">
+                            Login
+                        </button>
+                    </form>
+                    <div id="login-error" class="error-msg hidden"></div>
+                </div>
+            </div>
+
+            <!-- Dashboard View (for Live Tracker) -->
+            <div id="dashboard-view" class="view hidden">
+                <header>
+                    <div class="header-content">
+                        <div>
+                            <h1>Live Tracker</h1>
+                            <p class="subtitle">
+                                Real-time gym attendance session
+                            </p>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="content">
+                    <div id="status-card" class="card status-card">
+                        <div class="loader"></div>
+                    </div>
+
+                    <div class="actions">
+                        <button
+                            id="checkin-btn"
+                            class="btn btn-big btn-primary hidden">
+                            Check In
+                        </button>
+                        <button
+                            id="checkout-btn"
+                            class="btn btn-big btn-secondary hidden">
+                            Check Out
+                        </button>
+                        <button
+                            id="direct-checkout-btn"
+                            class="btn btn-big btn-outline hidden">
+                            Direct Check Out
+                        </button>
+                        <div id="done-msg" class="card success-card hidden">
+                            <div class="icon">✓</div>
+                            <p>All set for today!</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History View (Live DB History) -->
+            <div id="history-view" class="view hidden">
+                <header>
+                    <div class="header-content">
+                        <div>
+                            <h1>DB Attendance History</h1>
+                            <p class="subtitle">
+                                Attendance records from database
+                            </p>
+                        </div>
+                    </div>
+                </header>
+                <div class="content">
+                    <div id="history-list" class="history-list">
+                        <!-- DB History items injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal -->
+        <div id="modal-overlay" class="modal-overlay hidden">
+            <div class="modal card">
+                <h3 id="modal-title">Confirm</h3>
+                <p id="modal-message" style="margin: 10px 0 20px">
+                    Are you sure?
+                </p>
+                <div class="modal-actions">
+                    <button
+                        id="modal-cancel"
+                        class="btn btn-outline"
+                        style="flex: 1">
+                        Cancel
+                    </button>
+                    <button
+                        id="modal-confirm"
+                        class="btn btn-primary"
+                        style="flex: 1">
+                        Confirm
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="toast" class="toast hidden"></div>
+
+        <script src="app.js"></script>
+        <script>
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker
+                    .getRegistrations()
+                    .then((registrations) => {
+                        for (const registration of registrations) {
+                            registration.unregister();
+                        }
+                    });
+                if ('caches' in window) {
+                    caches
+                        .keys()
+                        .then((keys) =>
+                            keys.forEach((key) => caches.delete(key))
+                        );
+                }
+            }
+        </script>
+    </body>
+</html>
