@@ -59,7 +59,8 @@ describe('PDF Check-in History Parser', () => {
         const report = await parsePdfBuffer(buffer, {
             cycleCost: DEFAULT_CYCLE_COST,
             minAttendanceMinutes: SAFE_MIN_ATTENDANCE_MINUTES,
-            cycleLimit: DEFAULT_CYCLE_LIMIT
+            cycleLimit: DEFAULT_CYCLE_LIMIT,
+            checkYearDbExists: (year) => year === TEST_YEAR_2025
         });
 
         assert.equal(

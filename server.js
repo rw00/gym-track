@@ -78,7 +78,19 @@ export async function yearDbExists(year, customDbPath = DB_PATH) {
 export async function readDB(customDbPath = DB_PATH) {
     try {
         const data = await fs.readFile(customDbPath, 'utf8');
-        return JSON.parse(data);
+        const db = JSON.parse(data);
+        if (db.config) {
+            if (db.config.cycleAnchorDate) {
+                config.cycleAnchorDate = db.config.cycleAnchorDate;
+            }
+            if (db.config.cycleCost !== undefined) {
+                const parsed = Number.parseFloat(db.config.cycleCost);
+                if (!Number.isNaN(parsed)) {
+                    config.cycleCost = parsed;
+                }
+            }
+        }
+        return db;
     } catch (err) {
         console.error('Error reading DB:', err);
         return { attendance: [], activeSession: null };
@@ -402,6 +414,61 @@ app.post('/login', (req, res) => {
 app.post('/logout', (req, res) => {
     req.session.destroy();
     res.json({ success: true });
+});
+
+app.get('/api/config', isAuthenticated, async (req, res) => {
+    await readDB();
+    res.json({
+        cycleAnchorDate: config.cycleAnchorDate,
+        cycleCost: config.cycleCost,
+        cycleBaseAmount: config.cycleCost
+    });
+});
+
+app.post('/api/config', isAuthenticated, async (req, res) => {
+    const { cycleAnchorDate, cycleCost, cycleBaseAmount } = req.body;
+
+    const costValue = cycleCost !== undefined ? cycleCost : cycleBaseAmount;
+    const newCost = Number.parseFloat(costValue);
+
+    if (Number.isNaN(newCost) || newCost < 0) {
+        return res.status(HTTP_STATUS.BAD_REQUEST).json({
+            error: 'Monthly amount must be a valid non-negative number'
+        });
+    }
+
+    if (!cycleAnchorDate || typeof cycleAnchorDate !== 'string') {
+        return res
+            .status(HTTP_STATUS.BAD_REQUEST)
+            .json({ error: 'Cycle anchor date is required' });
+    }
+
+    try {
+        Temporal.PlainDate.from(cycleAnchorDate);
+    } catch {
+        return res
+            .status(HTTP_STATUS.BAD_REQUEST)
+            .json({ error: 'Invalid cycle anchor date format' });
+    }
+
+    config.cycleAnchorDate = cycleAnchorDate;
+    config.cycleCost = newCost;
+
+    const db = await readDB();
+    db.config = {
+        cycleAnchorDate: config.cycleAnchorDate,
+        cycleCost: config.cycleCost
+    };
+    await writeDB(db);
+
+    res.json({
+        success: true,
+        config: {
+            cycleAnchorDate: config.cycleAnchorDate,
+            cycleCost: config.cycleCost,
+            cycleBaseAmount: config.cycleCost
+        }
+    });
 });
 
 app.get('/api/status', isAuthenticated, async (req, res) => {

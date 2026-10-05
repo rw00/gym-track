@@ -1186,3 +1186,41 @@ input:focus {
         font-size: 1.05rem;
     }
 }
+
+/* Config Page Styles */
+.config-card {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-color: rgba(56, 189, 248, 0.2);
+    padding: 28px;
+    max-width: 540px;
+    margin: 0 auto;
+}
+
+.input-help {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 5px;
+    line-height: 1.4;
+}
+
+input[type='date'] {
+    color-scheme: dark;
+}
+
+.success-msg {
+    color: var(--accent);
+    margin-top: 12px;
+    text-align: center;
+    font-size: 0.9rem;
+    padding: 10px;
+    background: rgba(16, 185, 129, 0.14);
+    border-radius: var(--radius-sm);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.success-msg:empty {
+    display: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+}

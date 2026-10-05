@@ -47,13 +47,15 @@ const views = {
     report: document.getElementById('report-view'),
     login: document.getElementById('login-view'),
     dashboard: document.getElementById('dashboard-view'),
-    history: document.getElementById('history-view')
+    history: document.getElementById('history-view'),
+    config: document.getElementById('config-view')
 };
 
 const appNav = document.getElementById('app-nav');
 const navReportBtn = document.getElementById('nav-report-btn');
 const navHistoryBtn = document.getElementById('nav-history-btn');
 const navLiveBtn = document.getElementById('nav-live-btn');
+const navConfigBtn = document.getElementById('nav-config-btn');
 const navLogoutBtn = document.getElementById('nav-logout-btn');
 
 const hamburgerBtn = document.getElementById('nav-hamburger-btn');
@@ -61,6 +63,7 @@ const mobileNavMenu = document.getElementById('mobile-nav-menu');
 const mobileNavReportBtn = document.getElementById('mobile-nav-report-btn');
 const mobileNavHistoryBtn = document.getElementById('mobile-nav-history-btn');
 const mobileNavLiveBtn = document.getElementById('mobile-nav-live-btn');
+const mobileNavConfigBtn = document.getElementById('mobile-nav-config-btn');
 const mobileNavLogoutBtn = document.getElementById('mobile-nav-logout-btn');
 
 const pdfDropzone = document.getElementById('pdf-dropzone');
@@ -199,11 +202,13 @@ function switchView(viewName, pushHistory = true) {
             const isReport = viewName === 'report';
             const isHistory = viewName === 'history';
             const isLive = viewName === 'dashboard';
+            const isConfig = viewName === 'config';
 
             if (navReportBtn) navReportBtn.classList.toggle('active', isReport);
             if (navHistoryBtn)
                 navHistoryBtn.classList.toggle('active', isHistory);
             if (navLiveBtn) navLiveBtn.classList.toggle('active', isLive);
+            if (navConfigBtn) navConfigBtn.classList.toggle('active', isConfig);
 
             if (mobileNavReportBtn)
                 mobileNavReportBtn.classList.toggle('active', isReport);
@@ -211,10 +216,13 @@ function switchView(viewName, pushHistory = true) {
                 mobileNavHistoryBtn.classList.toggle('active', isHistory);
             if (mobileNavLiveBtn)
                 mobileNavLiveBtn.classList.toggle('active', isLive);
+            if (mobileNavConfigBtn)
+                mobileNavConfigBtn.classList.toggle('active', isConfig);
         }
 
         if (viewName === 'dashboard') loadStatus();
         if (viewName === 'history') loadHistory();
+        if (viewName === 'config') loadConfig();
     }
 }
 
@@ -614,6 +622,32 @@ async function loadHistory() {
     renderHistory();
 }
 
+async function loadConfig() {
+    const anchorDateInput = document.getElementById('config-anchor-date');
+    const cycleCostInput = document.getElementById('config-cycle-cost');
+    const configError = document.getElementById('config-error');
+    const configSuccess = document.getElementById('config-success');
+
+    if (configError) {
+        configError.innerText = '';
+        configError.classList.add('hidden');
+    }
+    if (configSuccess) {
+        configSuccess.innerText = '';
+        configSuccess.classList.add('hidden');
+    }
+
+    const data = await api('/api/config');
+    if (!data) return;
+
+    if (anchorDateInput && data.cycleAnchorDate) {
+        anchorDateInput.value = data.cycleAnchorDate;
+    }
+    if (cycleCostInput && data.cycleCost !== undefined) {
+        cycleCostInput.value = data.cycleCost;
+    }
+}
+
 function loaderView() {
     return `<div class="loader"></div>`;
 }
@@ -700,6 +734,10 @@ if (navLiveBtn) {
     navLiveBtn.onclick = () => switchView('dashboard');
 }
 
+if (navConfigBtn) {
+    navConfigBtn.onclick = () => switchView('config');
+}
+
 if (navLogoutBtn) {
     navLogoutBtn.onclick = async () => {
         await api('/logout', 'POST');
@@ -717,6 +755,10 @@ if (mobileNavHistoryBtn) {
 
 if (mobileNavLiveBtn) {
     mobileNavLiveBtn.onclick = () => switchView('dashboard');
+}
+
+if (mobileNavConfigBtn) {
+    mobileNavConfigBtn.onclick = () => switchView('config');
 }
 
 if (mobileNavLogoutBtn) {
@@ -747,6 +789,64 @@ if (loginForm) {
         } else if (loginError) {
             loginError.innerText = 'Invalid username or password';
             loginError.classList.remove('hidden');
+        }
+    };
+}
+
+const configForm = document.getElementById('config-form');
+if (configForm) {
+    configForm.onsubmit = async (e) => {
+        e.preventDefault();
+        const anchorDateInput = document.getElementById('config-anchor-date');
+        const cycleCostInput = document.getElementById('config-cycle-cost');
+        const configError = document.getElementById('config-error');
+        const configSuccess = document.getElementById('config-success');
+
+        if (configError) {
+            configError.innerText = '';
+            configError.classList.add('hidden');
+        }
+        if (configSuccess) {
+            configSuccess.innerText = '';
+            configSuccess.classList.add('hidden');
+        }
+
+        const cycleAnchorDate = anchorDateInput?.value;
+        const cycleCost = Number.parseFloat(cycleCostInput?.value);
+
+        if (!cycleAnchorDate) {
+            if (configError) {
+                configError.innerText = 'Please select a cycle anchor date.';
+                configError.classList.remove('hidden');
+            }
+            return;
+        }
+
+        if (Number.isNaN(cycleCost) || cycleCost < 0) {
+            if (configError) {
+                configError.innerText =
+                    'Please enter a valid non-negative monthly amount.';
+                configError.classList.remove('hidden');
+            }
+            return;
+        }
+
+        const res = await api('/api/config', 'POST', {
+            cycleAnchorDate,
+            cycleCost
+        });
+
+        if (res?.success) {
+            if (configSuccess) {
+                configSuccess.innerText = 'Configuration saved successfully!';
+                configSuccess.classList.remove('hidden');
+            }
+            showToast('Configuration updated!');
+        } else if (res?.error) {
+            if (configError) {
+                configError.innerText = res.error;
+                configError.classList.remove('hidden');
+            }
         }
     };
 }
