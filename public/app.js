@@ -540,6 +540,44 @@ function formatDateWithWeekday(isoDateStr) {
     });
 }
 
+function isoToDMY(isoStr) {
+    if (!isoStr) return '';
+    const parts = isoStr.trim().split('-');
+    if (parts.length === 3) {
+        const [y, m, d] = parts;
+        return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+    }
+    return isoStr;
+}
+
+function parseDMYToIso(dmyStr) {
+    if (!dmyStr) return null;
+    const trimmed = dmyStr.trim();
+    let y, m, d;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        [y, m, d] = trimmed.split('-').map(Number);
+    } else {
+        const match = trimmed.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+        if (!match) return null;
+        d = parseInt(match[1], 10);
+        m = parseInt(match[2], 10);
+        y = parseInt(match[3], 10);
+    }
+    if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1900 || y > 2100) return null;
+
+    const dateObj = new Date(y, m - 1, d);
+    if (
+        dateObj.getFullYear() !== y ||
+        dateObj.getMonth() !== m - 1 ||
+        dateObj.getDate() !== d
+    ) {
+        return null;
+    }
+    const isoM = String(m).padStart(2, '0');
+    const isoD = String(d).padStart(2, '0');
+    return `${y}-${isoM}-${isoD}`;
+}
+
 async function loadStatus() {
     if (statusCard) statusCard.innerHTML = loaderView();
     const data = await api('/api/status');
@@ -624,6 +662,9 @@ async function loadHistory() {
 
 async function loadConfig() {
     const anchorDateInput = document.getElementById('config-anchor-date');
+    const anchorDatePicker = document.getElementById(
+        'config-anchor-date-picker'
+    );
     const cycleCostInput = document.getElementById('config-cycle-cost');
     const configError = document.getElementById('config-error');
     const configSuccess = document.getElementById('config-success');
@@ -641,7 +682,10 @@ async function loadConfig() {
     if (!data) return;
 
     if (anchorDateInput && data.cycleAnchorDate) {
-        anchorDateInput.value = data.cycleAnchorDate;
+        anchorDateInput.value = isoToDMY(data.cycleAnchorDate);
+        if (anchorDatePicker) {
+            anchorDatePicker.value = data.cycleAnchorDate;
+        }
     }
     if (cycleCostInput && data.cycleCost !== undefined) {
         cycleCostInput.value = data.cycleCost;
@@ -793,11 +837,46 @@ if (loginForm) {
     };
 }
 
+const anchorDateInput = document.getElementById('config-anchor-date');
+const anchorDatePicker = document.getElementById('config-anchor-date-picker');
+const anchorDateBtn = document.getElementById('config-anchor-date-btn');
+
+if (anchorDateBtn && anchorDatePicker) {
+    anchorDateBtn.onclick = () => {
+        if (anchorDateInput?.value) {
+            const iso = parseDMYToIso(anchorDateInput.value);
+            if (iso) anchorDatePicker.value = iso;
+        }
+        if (typeof anchorDatePicker.showPicker === 'function') {
+            anchorDatePicker.showPicker();
+        } else {
+            anchorDatePicker.click();
+        }
+    };
+}
+
+if (anchorDatePicker && anchorDateInput) {
+    anchorDatePicker.onchange = () => {
+        if (anchorDatePicker.value) {
+            anchorDateInput.value = isoToDMY(anchorDatePicker.value);
+        }
+    };
+}
+
+if (anchorDateInput) {
+    anchorDateInput.onchange = () => {
+        const iso = parseDMYToIso(anchorDateInput.value);
+        if (iso) {
+            anchorDateInput.value = isoToDMY(iso);
+            if (anchorDatePicker) anchorDatePicker.value = iso;
+        }
+    };
+}
+
 const configForm = document.getElementById('config-form');
 if (configForm) {
     configForm.onsubmit = async (e) => {
         e.preventDefault();
-        const anchorDateInput = document.getElementById('config-anchor-date');
         const cycleCostInput = document.getElementById('config-cycle-cost');
         const configError = document.getElementById('config-error');
         const configSuccess = document.getElementById('config-success');
@@ -811,12 +890,14 @@ if (configForm) {
             configSuccess.classList.add('hidden');
         }
 
-        const cycleAnchorDate = anchorDateInput?.value;
+        const rawAnchorDate = anchorDateInput?.value;
+        const cycleAnchorDate = parseDMYToIso(rawAnchorDate);
         const cycleCost = Number.parseFloat(cycleCostInput?.value);
 
         if (!cycleAnchorDate) {
             if (configError) {
-                configError.innerText = 'Please select a cycle anchor date.';
+                configError.innerText =
+                    'Please enter a valid date in DD/MM/YYYY format.';
                 configError.classList.remove('hidden');
             }
             return;

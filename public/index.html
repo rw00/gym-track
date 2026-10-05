@@ -365,14 +365,32 @@
                                 <label for="config-anchor-date"
                                     >Cycle Anchor Date</label
                                 >
-                                <input
-                                    type="date"
-                                    id="config-anchor-date"
-                                    name="cycleAnchorDate"
-                                    required />
+                                <div class="date-input-wrapper">
+                                    <input
+                                        type="text"
+                                        id="config-anchor-date"
+                                        name="cycleAnchorDate"
+                                        placeholder="DD/MM/YYYY"
+                                        pattern="\d{2}/\d{2}/\d{4}"
+                                        required />
+                                    <input
+                                        type="date"
+                                        id="config-anchor-date-picker"
+                                        class="hidden-date-picker"
+                                        tabindex="-1"
+                                        aria-hidden="true" />
+                                    <button
+                                        type="button"
+                                        id="config-anchor-date-btn"
+                                        class="date-picker-btn"
+                                        title="Open calendar"
+                                        aria-label="Open calendar">
+                                        📅
+                                    </button>
+                                </div>
                                 <p class="input-help">
                                     Reference start date for 4-week billing
-                                    cycles (e.g. 2026-06-22).
+                                    cycles.
                                 </p>
                             </div>
                             <div class="input-group">

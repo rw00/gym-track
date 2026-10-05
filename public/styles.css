@@ -842,6 +842,45 @@ input:focus {
     box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.15);
 }
 
+.date-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.date-input-wrapper input[type='text'] {
+    padding-right: 48px;
+}
+
+.hidden-date-picker {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+}
+
+.date-picker-btn {
+    position: absolute;
+    right: 8px;
+    background: transparent;
+    border: none;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 6px 8px;
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease;
+    color: var(--text-muted);
+}
+
+.date-picker-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
 /* Buttons */
 .btn {
     display: block;
