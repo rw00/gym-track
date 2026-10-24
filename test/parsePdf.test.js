@@ -12,7 +12,6 @@ import {
     MIN_ATTENDANCE_MINUTES,
     SAFE_MIN_ATTENDANCE_MINUTES,
     DEFAULT_CYCLE_LIMIT,
-    DEFAULT_CYCLE_COST,
     DEFAULT_DISCOUNT_PER_VISIT,
     CYCLE_LENGTH_DAYS,
     CURRENCY_DECIMAL_PLACES
@@ -38,6 +37,8 @@ const TOTAL_EXPECTED_DISCOUNT =
 const TOTAL_HISTORICAL_RAW_RECORDS = 329;
 const TOTAL_HISTORICAL_CYCLES = 16;
 const GLITCH_CYCLE_VALID_COUNT = 20;
+const TEST_CYCLE_COST = 60.8;
+const TEST_ANCHOR_DATE = '2026-06-22';
 
 const TEST_YEAR_2026 = 2026;
 const TEST_YEAR_2025 = 2025;
@@ -57,7 +58,8 @@ describe('PDF Check-in History Parser', () => {
             return;
         }
         const report = await parsePdfBuffer(buffer, {
-            cycleCost: DEFAULT_CYCLE_COST,
+            anchorDate: TEST_ANCHOR_DATE,
+            cycleCost: TEST_CYCLE_COST,
             minAttendanceMinutes: SAFE_MIN_ATTENDANCE_MINUTES,
             cycleLimit: DEFAULT_CYCLE_LIMIT,
             checkYearDbExists: (year) => year === TEST_YEAR_2025
@@ -93,7 +95,7 @@ describe('PDF Check-in History Parser', () => {
             c1.expectedPayment,
             Number(
                 (
-                    DEFAULT_CYCLE_COST -
+                    TEST_CYCLE_COST -
                     c1.validCount * DEFAULT_DISCOUNT_PER_VISIT
                 ).toFixed(CURRENCY_DECIMAL_PLACES)
             )
@@ -112,7 +114,7 @@ describe('PDF Check-in History Parser', () => {
             c2.expectedPayment,
             Number(
                 (
-                    DEFAULT_CYCLE_COST -
+                    TEST_CYCLE_COST -
                     c2.validCount * DEFAULT_DISCOUNT_PER_VISIT
                 ).toFixed(CURRENCY_DECIMAL_PLACES)
             )
@@ -131,7 +133,7 @@ describe('PDF Check-in History Parser', () => {
             c3.expectedPayment,
             Number(
                 (
-                    DEFAULT_CYCLE_COST -
+                    TEST_CYCLE_COST -
                     c3.validCount * DEFAULT_DISCOUNT_PER_VISIT
                 ).toFixed(CURRENCY_DECIMAL_PLACES)
             )
@@ -155,7 +157,8 @@ describe('PDF Check-in History Parser', () => {
             return;
         }
         const report = await parsePdfBuffer(buffer, {
-            cycleCost: DEFAULT_CYCLE_COST,
+            anchorDate: TEST_ANCHOR_DATE,
+            cycleCost: TEST_CYCLE_COST,
             minAttendanceMinutes: SAFE_MIN_ATTENDANCE_MINUTES,
             cycleLimit: 0,
             checkYearDbExists: () => false
@@ -183,7 +186,7 @@ describe('PDF Check-in History Parser', () => {
             cycleWithGlitch.expectedPayment,
             Number(
                 (
-                    DEFAULT_CYCLE_COST -
+                    TEST_CYCLE_COST -
                     cycleWithGlitch.validCount * DEFAULT_DISCOUNT_PER_VISIT
                 ).toFixed(CURRENCY_DECIMAL_PLACES)
             )
@@ -258,7 +261,7 @@ Date Time Studio
 
         const cycles = groupIntoCycles(days, {
             anchorDate: '2025-12-29',
-            cycleCost: DEFAULT_CYCLE_COST
+            cycleCost: TEST_CYCLE_COST
         });
         assert.equal(cycles.length, 1);
         const cycle = cycles[0];
@@ -277,10 +280,35 @@ Date Time Studio
             cycle.expectedPayment,
             Number(
                 (
-                    DEFAULT_CYCLE_COST -
+                    TEST_CYCLE_COST -
                     cycle.validCount * DEFAULT_DISCOUNT_PER_VISIT
                 ).toFixed(CURRENCY_DECIMAL_PLACES)
             )
+        );
+    });
+
+    test('requires anchorDate and cycleCost in parsePdfBuffer and groupIntoCycles', async () => {
+        assert.throws(
+            () => groupIntoCycles([], { cycleCost: TEST_CYCLE_COST }),
+            /anchorDate is required/
+        );
+        assert.throws(
+            () => groupIntoCycles([], { anchorDate: TEST_ANCHOR_DATE }),
+            /cycleCost is required/
+        );
+        await assert.rejects(
+            async () =>
+                parsePdfBuffer(Buffer.from(''), {
+                    cycleCost: TEST_CYCLE_COST
+                }),
+            /anchorDate is required/
+        );
+        await assert.rejects(
+            async () =>
+                parsePdfBuffer(Buffer.from(''), {
+                    anchorDate: TEST_ANCHOR_DATE
+                }),
+            /cycleCost is required/
         );
     });
 });

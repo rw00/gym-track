@@ -35,15 +35,8 @@ export const DAYS_PER_WEEK = 7;
 export const CYCLE_LENGTH_DAYS = WEEKS_PER_CYCLE * DAYS_PER_WEEK;
 export const CYCLE_END_DAY_OFFSET = 1;
 export const DEFAULT_CYCLE_LIMIT = 3;
-export const DEFAULT_CYCLE_COST = 60.8;
-export const DEFAULT_CYCLE_BASE_AMOUNT = DEFAULT_CYCLE_COST;
 export const DEFAULT_DISCOUNT_PER_VISIT = 1.0;
-export const DEFAULT_CYCLE_ANCHOR_DATE = '2026-06-22';
 export const CURRENCY_DECIMAL_PLACES = 2;
-
-export const DEFAULT_SEED_START_DATE = '2026-05-27';
-export const DEFAULT_SEED_END_DATE = '2026-06-05';
-export const DEFAULT_SEED_DURATION_MINUTES = 60;
 
 export const HTTP_STATUS = {
     OK: 200,
@@ -64,23 +57,35 @@ export const config = {
         password: process.env.ADMIN_PASS || 'admin'
     },
     sessionSecret: process.env.SESSION_SECRET || DEFAULT_SESSION_SECRET,
-    cycleCost: Number.parseFloat(
-        process.env.CYCLE_COST ||
-            process.env.CYCLE_BASE_AMOUNT ||
-            String(DEFAULT_CYCLE_COST)
-    ),
+    cycleCost: (() => {
+        const envVal = process.env.CYCLE_COST || process.env.CYCLE_BASE_AMOUNT;
+        if (envVal !== undefined && envVal !== null && envVal !== '') {
+            const parsed = Number.parseFloat(envVal);
+            return Number.isNaN(parsed) ? null : parsed;
+        }
+        return null;
+    })(),
     get cycleBaseAmount() {
         return this.cycleCost;
     },
     set cycleBaseAmount(val) {
         this.cycleCost = val;
     },
-    cycleAnchorDate: process.env.CYCLE_ANCHOR_DATE || DEFAULT_CYCLE_ANCHOR_DATE,
+    cycleAnchorDate: process.env.CYCLE_ANCHOR_DATE || null,
     minAttendanceMinutes: Number.parseInt(
         process.env.MIN_ATTENDANCE_MINUTES ||
             String(DEFAULT_MIN_ATTENDANCE_MINUTES),
         10
-    ),
-    seedStartDate: process.env.SEED_START_DATE || DEFAULT_SEED_START_DATE,
-    seedEndDate: process.env.SEED_END_DATE || DEFAULT_SEED_END_DATE
+    )
 };
+
+export function isConfigured(cfg = config) {
+    return Boolean(
+        cfg &&
+        cfg.cycleAnchorDate &&
+        typeof cfg.cycleAnchorDate === 'string' &&
+        cfg.cycleCost !== null &&
+        cfg.cycleCost !== undefined &&
+        !Number.isNaN(Number(cfg.cycleCost))
+    );
+}

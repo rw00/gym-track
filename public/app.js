@@ -1,3 +1,10 @@
+import { AttendanceCalendar, loadMarkedDays } from './attendanceCalendar.js';
+import {
+    compareAttendance,
+    getVerificationWindow,
+    localTodayIso
+} from './attendanceCompare.js';
+
 const MIN_ATTENDANCE_MINUTES = 30;
 const SAFE_ATTENDANCE_OFFSET = 1;
 const SAFE_MIN_ATTENDANCE_MINUTES =
@@ -6,7 +13,6 @@ const DEFAULT_CYCLE_LIMIT = 3;
 const WEEKS_PER_CYCLE = 4;
 const DAYS_PER_WEEK = 7;
 const CYCLE_LENGTH_DAYS = WEEKS_PER_CYCLE * DAYS_PER_WEEK;
-const DEFAULT_CYCLE_COST = 60.8;
 const DEFAULT_DISCOUNT_PER_VISIT = 1.0;
 const CURRENCY_DECIMAL_PLACES = 2;
 const JS_MONTH_OFFSET = 1;
@@ -30,17 +36,23 @@ window.APP_CONSTANTS = {
     WEEKS_PER_CYCLE,
     DAYS_PER_WEEK,
     CYCLE_LENGTH_DAYS,
-    DEFAULT_CYCLE_COST,
     DEFAULT_DISCOUNT_PER_VISIT,
     CURRENCY_DECIMAL_PLACES
 };
+
+let selectCalendar = null;
+let verifyCalendar = null;
 
 const state = {
     view: 'login',
     status: null,
     history: [],
     pdfReport: null,
-    allExpanded: false
+    allExpanded: false,
+    config: null,
+    verificationWindow: null,
+    comparison: null,
+    activeStatusFilter: null
 };
 
 const views = {
@@ -171,7 +183,26 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+function isAppConfigured() {
+    return Boolean(
+        state.config &&
+        state.config.cycleAnchorDate &&
+        typeof state.config.cycleAnchorDate === 'string' &&
+        state.config.cycleCost !== null &&
+        state.config.cycleCost !== undefined &&
+        !Number.isNaN(Number(state.config.cycleCost))
+    );
+}
+
 function switchView(viewName, pushHistory = true) {
+    if (viewName !== 'login' && viewName !== 'config' && !isAppConfigured()) {
+        showToast('Please configure your billing cycle settings first.');
+        if (window.location.hash !== '#config') {
+            window.history.replaceState({ view: 'config' }, '', '#config');
+        }
+        viewName = 'config';
+    }
+
     Object.keys(views).forEach((v) => {
         if (views[v]) views[v].classList.add('hidden');
     });
@@ -220,6 +251,7 @@ function switchView(viewName, pushHistory = true) {
                 mobileNavConfigBtn.classList.toggle('active', isConfig);
         }
 
+        if (viewName === 'report') loadReportView();
         if (viewName === 'dashboard') loadStatus();
         if (viewName === 'history') loadHistory();
         if (viewName === 'config') loadConfig();
@@ -304,14 +336,264 @@ function setupPdfHandlers() {
     const newUploadBtn = document.getElementById('new-upload-btn');
     if (newUploadBtn) {
         newUploadBtn.addEventListener('click', () => {
-            const dropzoneCard = document.getElementById('dropzone-card');
+            const uploadFlow = document.getElementById('upload-flow-container');
             const pdfHero = document.getElementById('pdf-hero');
-            if (dropzoneCard) dropzoneCard.classList.remove('hidden');
+            if (uploadFlow) uploadFlow.classList.remove('hidden');
             if (pdfHero) pdfHero.classList.remove('hidden');
+            const dropzoneCard = document.getElementById('dropzone-card');
             if (dropzoneCard)
                 dropzoneCard.scrollIntoView({ behavior: 'smooth' });
         });
     }
+
+    const editMarkedDaysBtn = document.getElementById('edit-marked-days-btn');
+    if (editMarkedDaysBtn) {
+        editMarkedDaysBtn.addEventListener('click', () => {
+            const uploadFlow = document.getElementById('upload-flow-container');
+            const pdfHero = document.getElementById('pdf-hero');
+            if (uploadFlow) uploadFlow.classList.remove('hidden');
+            if (pdfHero) pdfHero.classList.remove('hidden');
+            const stepCard = document.getElementById('step-mark-days-card');
+            if (stepCard) stepCard.scrollIntoView({ behavior: 'smooth' });
+        });
+    }
+}
+
+async function loadReportView() {
+    await initVerificationWindow();
+    initSelectCalendar();
+    initVerifyCalendar();
+    if (state.pdfReport) {
+        runVerification();
+    }
+}
+
+async function initVerificationWindow() {
+    if (!state.config) {
+        state.config = await api('/api/config');
+    }
+    if (!state.config?.cycleAnchorDate) {
+        state.verificationWindow = null;
+        switchView('config');
+        return;
+    }
+    const anchorDate = state.config.cycleAnchorDate;
+    const today = localTodayIso();
+    state.verificationWindow = getVerificationWindow({
+        anchorDate,
+        today,
+        cycleCount: DEFAULT_CYCLE_LIMIT,
+        cycleLengthDays: CYCLE_LENGTH_DAYS
+    });
+}
+
+function initSelectCalendar() {
+    const host = document.getElementById('select-calendar-host');
+    if (!host) return;
+    if (!selectCalendar) {
+        selectCalendar = new AttendanceCalendar({
+            onChange: (selected) => {
+                if (verifyCalendar) {
+                    verifyCalendar.selected = selected;
+                    verifyCalendar.render();
+                }
+                if (state.pdfReport) {
+                    runVerification();
+                }
+            }
+        });
+        host.innerHTML = '';
+        host.appendChild(selectCalendar.el);
+    }
+    if (state.verificationWindow) {
+        selectCalendar.setWindow(state.verificationWindow);
+    }
+}
+
+function initVerifyCalendar() {
+    const host = document.getElementById('verify-calendar-host');
+    if (!host) return;
+    if (!verifyCalendar) {
+        verifyCalendar = new AttendanceCalendar({
+            onChange: (selected) => {
+                if (selectCalendar) {
+                    selectCalendar.selected = selected;
+                    selectCalendar.render();
+                }
+                if (state.pdfReport) {
+                    runVerification();
+                }
+            }
+        });
+        verifyCalendar.setMode('compare');
+        host.innerHTML = '';
+        host.appendChild(verifyCalendar.el);
+    }
+    if (state.verificationWindow) {
+        verifyCalendar.setWindow(state.verificationWindow);
+    }
+}
+
+function runVerification() {
+    if (!state.pdfReport || !state.verificationWindow || !isAppConfigured())
+        return;
+    const markedDates = selectCalendar
+        ? selectCalendar.getSelected()
+        : loadMarkedDays();
+    const cycleCost = state.config.cycleCost;
+
+    const comparison = compareAttendance({
+        markedDates,
+        dailyRecords: state.pdfReport.dailyRecords || [],
+        window: state.verificationWindow,
+        cycleCost,
+        discountPerVisit: DEFAULT_DISCOUNT_PER_VISIT
+    });
+    state.comparison = comparison;
+
+    renderVerificationSummary(comparison);
+
+    if (verifyCalendar) {
+        verifyCalendar.selected = new Set(markedDates);
+        verifyCalendar.setStatuses(comparison.days);
+        verifyCalendar.setFilter(state.activeStatusFilter);
+        verifyCalendar.render();
+    }
+
+    renderCurrentFilter();
+}
+
+function renderVerificationSummary(comparison) {
+    const container = document.getElementById('verification-section');
+    const card = document.getElementById('verification-card');
+    if (!container || !card) return;
+
+    container.classList.remove('hidden');
+
+    const { counts, totals } = comparison;
+    const hasMissing = counts.missing > 0;
+    const overcharged = totals.overcharge > 0;
+
+    const totalMarked = counts.marked;
+    const verified = counts.verified;
+    const percent =
+        totalMarked > 0 ? Math.round((verified / totalMarked) * 100) : 100;
+    const strokeDash = 251.2;
+    const offset = strokeDash - (percent / 100) * strokeDash;
+
+    let headlineHtml = '';
+    let subtitleText = '';
+    if (totalMarked === 0) {
+        headlineHtml = `<h3 class="verify-headline">PDF Check-in Results</h3>`;
+        subtitleText = `No visits marked for verification. You can mark days anytime using the calendar below.`;
+    } else if (hasMissing) {
+        headlineHtml = `<h3 class="verify-headline has-missing">⚠️ ${counts.missing} day${counts.missing > 1 ? 's' : ''} missing from gym records</h3>`;
+        subtitleText = `You marked ${totalMarked} day${totalMarked > 1 ? 's' : ''}, but the gym only counted ${verified}. Check your bank charges below.`;
+    } else {
+        headlineHtml = `<h3 class="verify-headline all-good">✓ All ${verified} visit${verified > 1 ? 's' : ''} verified</h3>`;
+        subtitleText = `Every day you marked as trained was correctly recorded and counted by the gym.`;
+    }
+
+    let totalGymPayment = 0;
+    let totalCorrectedPayment = 0;
+    for (const c of comparison.cycles) {
+        totalGymPayment += c.gymPayment;
+        totalCorrectedPayment += c.correctedPayment;
+    }
+
+    const bankBoxClass = overcharged
+        ? 'bank-compare-box is-overcharged'
+        : 'bank-compare-box is-matched';
+    const bankStatusText = overcharged
+        ? `<span style="color: #fb7185; font-weight: 700;">⚠️ Discrepancy: You paid €${totals.overcharge.toFixed(2)} more than expected</span>`
+        : `<span style="color: #34d399; font-weight: 700;">✓ Bank charges match your training attendance</span>`;
+
+    card.innerHTML = `
+        <div class="verify-hero-row">
+            <div class="verify-gauge" role="img" aria-label="${verified} of ${totalMarked} days verified">
+                <svg viewBox="0 0 100 100">
+                    <circle class="gauge-bg" cx="50" cy="50" r="40" />
+                    <circle class="gauge-fill" cx="50" cy="50" r="40"
+                        style="stroke-dasharray: ${strokeDash}; stroke-dashoffset: ${offset}; stroke: ${hasMissing ? '#fb7185' : 'var(--accent)'};" />
+                </svg>
+                <div class="verify-gauge-text">
+                    <span class="gauge-val">${totalMarked > 0 ? `${verified}/${totalMarked}` : `${state.pdfReport?.dailyRecords?.length || 0}`}</span>
+                    <span class="gauge-label">${totalMarked > 0 ? 'Verified' : 'Gym Visits'}</span>
+                </div>
+            </div>
+            <div class="verify-headline-wrap">
+                ${headlineHtml}
+                <p class="verify-subtitle">${subtitleText}</p>
+            </div>
+        </div>
+
+        <div class="${bankBoxClass}">
+            <div class="bank-compare-header">
+                <span class="bank-compare-title">💳 Bank Statement Verification (Last 3 Cycles)</span>
+                ${bankStatusText}
+            </div>
+            <div class="bank-compare-grid">
+                <div class="bank-item">
+                    <span class="bank-item-label">Gym Total Charge</span>
+                    <span class="bank-item-value">€${totalGymPayment.toFixed(2)}</span>
+                </div>
+                <div class="bank-item">
+                    <span class="bank-item-label">Expected with Marked Visits</span>
+                    <span class="bank-item-value">€${totalCorrectedPayment.toFixed(2)}</span>
+                </div>
+                <div class="bank-item">
+                    <span class="bank-item-label">${overcharged ? 'Potential Overcharge' : 'Difference'}</span>
+                    <span class="bank-item-value ${overcharged ? 'overcharge' : 'matched'}">
+                        ${overcharged ? `+€${totals.overcharge.toFixed(2)}` : '€0.00'}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="verify-chips" role="group" aria-label="Filter calendar by verification status">
+            <button type="button" class="verify-chip ${state.activeStatusFilter === null ? 'active' : ''}" data-filter="all">
+                All Days
+            </button>
+            <button type="button" class="verify-chip ${state.activeStatusFilter === 'verified' ? 'active' : ''}" data-filter="verified">
+                <span class="verify-chip-dot dot-verified"></span>
+                Verified (${counts.verified})
+            </button>
+            <button type="button" class="verify-chip ${state.activeStatusFilter === 'missing' ? 'active' : ''}" data-filter="missing">
+                <span class="verify-chip-dot dot-missing"></span>
+                Missing (${counts.missing})
+            </button>
+            <button type="button" class="verify-chip ${state.activeStatusFilter === 'not-counted' ? 'active' : ''}" data-filter="not-counted">
+                <span class="verify-chip-dot dot-not-counted"></span>
+                Not counted (${counts.notCounted})
+            </button>
+            <button type="button" class="verify-chip ${state.activeStatusFilter === 'unmarked' ? 'active' : ''}" data-filter="unmarked">
+                <span class="verify-chip-dot dot-unmarked"></span>
+                Unmarked (${counts.unmarked})
+            </button>
+            ${
+                counts.pending > 0
+                    ? `<button type="button" class="verify-chip ${state.activeStatusFilter === 'pending' ? 'active' : ''}" data-filter="pending">
+                        <span class="verify-chip-dot dot-pending"></span>
+                        Pending (${counts.pending})
+                    </button>`
+                    : ''
+            }
+        </div>
+    `;
+
+    card.querySelectorAll('.verify-chip').forEach((chip) => {
+        chip.addEventListener('click', () => {
+            const filter =
+                chip.dataset.filter === 'all' ? null : chip.dataset.filter;
+            state.activeStatusFilter = filter;
+            card.querySelectorAll('.verify-chip').forEach((c) =>
+                c.classList.toggle('active', c === chip)
+            );
+            if (verifyCalendar) {
+                verifyCalendar.setFilter(filter);
+            }
+        });
+    });
 }
 
 async function handlePdfFile(file) {
@@ -333,12 +615,21 @@ async function handlePdfFile(file) {
 
         if (!res.ok) {
             const errData = await res.json().catch(() => ({}));
+            if (errData.requiresConfig) {
+                switchView('config');
+                showToast(
+                    errData.error ||
+                        'Please configure your billing cycle settings first.'
+                );
+            }
             throw new Error(errData.error || 'Failed to parse PDF file');
         }
 
         const data = await res.json();
         state.pdfReport = data;
-        renderCurrentFilter();
+        await initVerificationWindow();
+        initVerifyCalendar();
+        runVerification();
         showToast('PDF parsed successfully!');
         if (state.view !== 'login') {
             loadStatus();
@@ -379,9 +670,9 @@ function renderCurrentFilter() {
     state.allExpanded = false;
     if (toggleAllBtn) toggleAllBtn.innerText = 'Expand All Details';
 
-    const dropzoneCard = document.getElementById('dropzone-card');
+    const uploadFlow = document.getElementById('upload-flow-container');
     const pdfHero = document.getElementById('pdf-hero');
-    if (dropzoneCard) dropzoneCard.classList.add('hidden');
+    if (uploadFlow) uploadFlow.classList.add('hidden');
     if (pdfHero) pdfHero.classList.add('hidden');
 
     if (cyclesSectionTitle) {
@@ -392,13 +683,81 @@ function renderCurrentFilter() {
     cyclesList.innerHTML = displayedCycles
         .map((cycle, idx) => {
             const hasEarly = cycle.tooEarlyCount > 0;
+            const cycleComp = state.comparison?.cycles?.find(
+                (c) => c.startDate === cycle.startDate
+            );
+
+            let verifyBadgeHtml = '';
+            let bankReconcileHtml = '';
+            let missingRowsHtml = '';
+
+            if (cycleComp && cycleComp.marked > 0) {
+                if (cycleComp.missing > 0) {
+                    verifyBadgeHtml = `
+                        <span class="cycle-verify-badge badge-alert">
+                            ⚠️ ${cycleComp.missing} visit${cycleComp.missing > 1 ? 's' : ''} not in PDF
+                        </span>
+                    `;
+                } else {
+                    verifyBadgeHtml = `
+                        <span class="cycle-verify-badge badge-good">
+                            ✓ All ${cycleComp.marked} visits verified
+                        </span>
+                    `;
+                }
+            }
+
+            if (cycleComp && cycleComp.overcharge > 0) {
+                bankReconcileHtml = `
+                    <div class="cycle-bank-reconcile">
+                        <span class="reconcile-text">
+                            💳 Bank Charge Discrepancy: Gym charged €${cycleComp.gymPayment.toFixed(CURRENCY_DECIMAL_PLACES)}, expected €${cycleComp.correctedPayment.toFixed(CURRENCY_DECIMAL_PLACES)}
+                        </span>
+                        <span class="reconcile-val">
+                            +€${cycleComp.overcharge.toFixed(CURRENCY_DECIMAL_PLACES)} overcharge
+                        </span>
+                    </div>
+                `;
+            }
+
+            if (
+                cycleComp &&
+                cycleComp.missingDates &&
+                cycleComp.missingDates.length > 0
+            ) {
+                missingRowsHtml = cycleComp.missingDates
+                    .map(
+                        (missingIso) => `
+                    <div class="session-row is-missing">
+                        <div class="session-left">
+                            <span class="session-date-time">
+                                ${formatDateWithWeekday(missingIso)}
+                            </span>
+                            <span class="session-studio">
+                                Marked by you · Not recorded by gym
+                            </span>
+                        </div>
+                        <div>
+                            <span class="session-status-tag tag-missing">
+                                ✕ Not in PDF
+                            </span>
+                        </div>
+                    </div>
+                `
+                    )
+                    .join('');
+            }
+
             return `
             <div class="cycle-card ${hasEarly ? 'has-too-early' : ''}" id="cycle-card-${idx}">
                 <div class="cycle-card-header">
                     <div class="cycle-date-range">
                         From ${formatDateShort(cycle.startDate)} to ${formatDateShort(cycle.endDate)}
                     </div>
+                    ${verifyBadgeHtml}
                 </div>
+
+                ${bankReconcileHtml}
 
                 ${
                     hasEarly
@@ -427,11 +786,12 @@ function renderCurrentFilter() {
                 </div>
 
                 <button class="cycle-details-toggle" data-idx="${idx}">
-                    <span>View ${cycle.records.length} Workout Days</span>
+                    <span>View ${cycle.records.length + (cycleComp ? cycleComp.missing : 0)} Workout Days</span>
                     <span class="toggle-arrow">▼</span>
                 </button>
 
                 <div class="sessions-accordion hidden" id="sessions-${idx}">
+                    ${missingRowsHtml}
                     ${cycle.records
                         .map((day) => {
                             const isCounted =
@@ -680,15 +1040,27 @@ async function loadConfig() {
 
     const data = await api('/api/config');
     if (!data) return;
+    state.config = data;
 
-    if (anchorDateInput && data.cycleAnchorDate) {
-        anchorDateInput.value = isoToDMY(data.cycleAnchorDate);
+    if (anchorDateInput) {
+        anchorDateInput.value = data.cycleAnchorDate
+            ? isoToDMY(data.cycleAnchorDate)
+            : '';
         if (anchorDatePicker) {
-            anchorDatePicker.value = data.cycleAnchorDate;
+            anchorDatePicker.value = data.cycleAnchorDate || '';
         }
     }
-    if (cycleCostInput && data.cycleCost !== undefined) {
-        cycleCostInput.value = data.cycleCost;
+    if (cycleCostInput) {
+        cycleCostInput.value =
+            data.cycleCost !== undefined && data.cycleCost !== null
+                ? data.cycleCost
+                : '';
+    }
+
+    if (!isAppConfigured() && configError) {
+        configError.innerText =
+            'Billing cycle anchor date and monthly amount are not set. Please enter them below to enable report calculations and attendance tracking.';
+        configError.classList.remove('hidden');
     }
 }
 
@@ -829,7 +1201,15 @@ if (loginForm) {
         });
 
         if (responseBody?.success) {
-            switchView('report');
+            await loadConfig();
+            if (!isAppConfigured()) {
+                switchView('config');
+                showToast(
+                    'Please configure your billing cycle settings first.'
+                );
+            } else {
+                switchView('report');
+            }
         } else if (loginError) {
             loginError.innerText = 'Invalid username or password';
             loginError.classList.remove('hidden');
@@ -918,8 +1298,11 @@ if (configForm) {
         });
 
         if (res?.success) {
+            state.config = res.config;
+            state.verificationWindow = null;
             if (configSuccess) {
-                configSuccess.innerText = 'Configuration saved successfully!';
+                configSuccess.innerText =
+                    'Configuration saved successfully! You can now access reports and tracking.';
                 configSuccess.classList.remove('hidden');
             }
             showToast('Configuration updated!');
@@ -993,8 +1376,12 @@ if (directCheckoutBtn) {
     const data = await api('/api/status');
     if (data) {
         state.status = data;
+        await loadConfig();
         const hashView = window.location.hash.replace('#', '');
-        if (hashView && views[hashView] && hashView !== 'login') {
+        if (!isAppConfigured()) {
+            switchView('config', false);
+            showToast('Please configure your billing cycle settings first.');
+        } else if (hashView && views[hashView] && hashView !== 'login') {
             switchView(hashView, false);
         } else {
             switchView('report', false);

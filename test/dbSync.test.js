@@ -7,8 +7,7 @@ import { fileURLToPath } from 'node:url';
 import {
     parsePdfBuffer,
     SAFE_MIN_ATTENDANCE_MINUTES,
-    MIN_ATTENDANCE_MINUTES,
-    DEFAULT_CYCLE_COST
+    MIN_ATTENDANCE_MINUTES
 } from '../pdfParser.js';
 import {
     syncAttendanceRecords,
@@ -29,6 +28,8 @@ const TEST_DB_PATH = path.join(__dirname, 'test-db.json');
 const TEST_CURRENT_YEAR = 2026;
 const TEST_PREVIOUS_YEAR = 2025;
 const TEST_2025_DB_PATH = getYearDbPath(TEST_PREVIOUS_YEAR, TEST_DB_PATH);
+const TEST_CYCLE_COST = 60.8;
+const TEST_ANCHOR_DATE = '2026-06-22';
 
 const DURATION_SHORT_DISCARDED = MIN_ATTENDANCE_MINUTES - 10;
 const DURATION_WORKOUT_54 = 54;
@@ -284,7 +285,8 @@ describe('Database Sync after PDF Processing', () => {
         await writeDB({ attendance: [] }, TEST_2025_DB_PATH);
 
         const report = await parsePdfBuffer(buffer, {
-            cycleCost: DEFAULT_CYCLE_COST,
+            anchorDate: TEST_ANCHOR_DATE,
+            cycleCost: TEST_CYCLE_COST,
             minAttendanceMinutes: SAFE_MIN_ATTENDANCE_MINUTES,
             cycleLimit: 0,
             currentYear: TEST_CURRENT_YEAR,

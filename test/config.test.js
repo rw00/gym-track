@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readDB, writeDB } from '../server.js';
-import { config } from '../config.js';
+import { config, isConfigured } from '../config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_DB_PATH = path.join(__dirname, 'test-config-db.json');
@@ -27,6 +27,29 @@ describe('Cycle Anchor and Monthly Amount Config', () => {
         } catch {
             // Ignore if deleted
         }
+    });
+
+    test('isConfigured reports false when cycleAnchorDate or cycleCost is null/unset', () => {
+        assert.equal(
+            isConfigured({ cycleAnchorDate: null, cycleCost: null }),
+            false
+        );
+        assert.equal(
+            isConfigured({ cycleAnchorDate: '2026-06-22', cycleCost: null }),
+            false
+        );
+        assert.equal(
+            isConfigured({ cycleAnchorDate: null, cycleCost: 60.8 }),
+            false
+        );
+        assert.equal(
+            isConfigured({ cycleAnchorDate: '2026-06-22', cycleCost: 60.8 }),
+            true
+        );
+        assert.equal(
+            isConfigured({ cycleAnchorDate: '2026-06-22', cycleCost: 0 }),
+            true
+        );
     });
 
     test('readDB loads stored config from db.json and updates config object', async () => {

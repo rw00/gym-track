@@ -15,7 +15,6 @@ import {
     CYCLE_LENGTH_DAYS,
     CYCLE_END_DAY_OFFSET,
     DEFAULT_DISCOUNT_PER_VISIT,
-    DEFAULT_SEED_DURATION_MINUTES,
     DIRECT_CHECKOUT_DURATION_MINUTES,
     MAX_UPLOAD_FILE_SIZE_BYTES,
     SESSION_COOKIE_MAX_AGE_MS,
@@ -303,55 +302,6 @@ export async function syncAttendanceRecords(
     };
 }
 
-function parseDateConfig(dateStr) {
-    if (!dateStr) return null;
-    if (/^\d{2}\/\d{2}\/\d{4}$/.test(dateStr)) {
-        const [day, month, year] = dateStr.split('/');
-        return `${year}-${month}-${day}`;
-    }
-    return dateStr;
-}
-
-async function seedDB() {
-    try {
-        const db = await readDB();
-        if (db.attendance?.length === 0) {
-            const parsedStart = parseDateConfig(config.seedStartDate);
-            const parsedEnd = parseDateConfig(config.seedEndDate);
-            if (!parsedStart || !parsedEnd) return;
-
-            const startDate = Temporal.PlainDate.from(parsedStart);
-            const endDate = Temporal.PlainDate.from(parsedEnd);
-
-            let currentDate = startDate;
-            while (Temporal.PlainDate.compare(currentDate, endDate) <= 0) {
-                const dateStr = currentDate.toString();
-                const startZonedDateTime = Temporal.ZonedDateTime.from(
-                    `${dateStr}T09:00:00[${config.timezone}]`
-                );
-                const endZonedDateTime = startZonedDateTime.add({
-                    minutes: DEFAULT_SEED_DURATION_MINUTES
-                });
-
-                db.attendance.push({
-                    date: dateStr,
-                    startTime: startZonedDateTime.toInstant().toString(),
-                    endTime: endZonedDateTime.toInstant().toString(),
-                    durationMinutes: DEFAULT_SEED_DURATION_MINUTES,
-                    method: 'standard'
-                });
-                currentDate = currentDate.add({ days: 1 });
-            }
-            await writeDB(db);
-            console.log(
-                `Successfully seeded check-ins from ${parsedStart} to ${parsedEnd}.`
-            );
-        }
-    } catch (err) {
-        console.error('Failed to seed check-ins:', err);
-    }
-}
-
 function isAuthenticated(req, res, next) {
     if (!req.session) {
         return res
@@ -367,6 +317,16 @@ function isAuthenticated(req, res, next) {
 
 app.post('/api/parse-pdf', upload.single('pdf'), async (req, res, next) => {
     try {
+        if (
+            !config.cycleAnchorDate ||
+            config.cycleCost === null ||
+            config.cycleCost === undefined
+        ) {
+            return res.status(HTTP_STATUS.BAD_REQUEST).json({
+                error: 'Configuration missing: please configure your cycle anchor date and cycle cost before parsing reports',
+                requiresConfig: true
+            });
+        }
         if (!req.file?.buffer) {
             return res
                 .status(HTTP_STATUS.BAD_REQUEST)
@@ -418,10 +378,16 @@ app.post('/logout', (req, res) => {
 
 app.get('/api/config', isAuthenticated, async (req, res) => {
     await readDB();
+    const isConfigured = Boolean(
+        config.cycleAnchorDate &&
+        config.cycleCost !== null &&
+        config.cycleCost !== undefined
+    );
     res.json({
         cycleAnchorDate: config.cycleAnchorDate,
         cycleCost: config.cycleCost,
-        cycleBaseAmount: config.cycleCost
+        cycleBaseAmount: config.cycleCost,
+        isConfigured
     });
 });
 
@@ -483,7 +449,12 @@ app.get('/api/status', isAuthenticated, async (req, res) => {
     res.json({
         activeSession: db.activeSession,
         attendedToday,
-        minAttendanceMinutes: config.minAttendanceMinutes
+        minAttendanceMinutes: config.minAttendanceMinutes,
+        isConfigured: Boolean(
+            config.cycleAnchorDate &&
+            config.cycleCost !== null &&
+            config.cycleCost !== undefined
+        )
     });
 });
 
@@ -641,7 +612,6 @@ app.use((err, req, res, next) => {
 
 (async () => {
     await ensurePartitionedByYear();
-    await seedDB();
 })();
 
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
@@ -651,4 +621,4 @@ if (isMain) {
     });
 }
 
-export { app, DB_PATH, seedDB };
+export { app, DB_PATH };

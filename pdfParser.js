@@ -8,9 +8,7 @@ import {
     DEFAULT_CYCLE_LIMIT,
     CYCLE_LENGTH_DAYS,
     CYCLE_END_DAY_OFFSET,
-    DEFAULT_CYCLE_COST,
     DEFAULT_DISCOUNT_PER_VISIT,
-    DEFAULT_CYCLE_ANCHOR_DATE as DEFAULT_ANCHOR_DATE,
     CURRENCY_DECIMAL_PLACES,
     MINUTES_PER_HOUR,
     MINUTES_PER_DAY,
@@ -23,9 +21,7 @@ export {
     DEFAULT_CYCLE_LIMIT,
     CYCLE_LENGTH_DAYS,
     CYCLE_END_DAY_OFFSET,
-    DEFAULT_CYCLE_COST,
     DEFAULT_DISCOUNT_PER_VISIT,
-    DEFAULT_ANCHOR_DATE,
     CURRENCY_DECIMAL_PLACES,
     MINUTES_PER_HOUR,
     MINUTES_PER_DAY
@@ -183,10 +179,21 @@ export function evaluateDailyAttendance(
 }
 
 export function groupIntoCycles(dailyRecords, options = {}) {
-    const anchorDateStr = options.anchorDate || DEFAULT_ANCHOR_DATE;
-    const cycleCost = options.cycleCost ?? DEFAULT_CYCLE_COST;
+    const anchorDateStr = options.anchorDate;
+    const cycleCost = options.cycleCost;
     const discountPerVisit =
         options.discountPerVisit ?? DEFAULT_DISCOUNT_PER_VISIT;
+
+    if (!anchorDateStr) {
+        throw new Error('options.anchorDate is required for groupIntoCycles');
+    }
+    if (
+        cycleCost === undefined ||
+        cycleCost === null ||
+        Number.isNaN(Number(cycleCost))
+    ) {
+        throw new Error('options.cycleCost is required for groupIntoCycles');
+    }
 
     const anchorDate = Temporal.PlainDate.from(anchorDateStr);
     const cycleMap = new Map();
@@ -264,11 +271,22 @@ export function groupIntoCycles(dailyRecords, options = {}) {
 export async function parsePdfBuffer(buffer, options = {}) {
     const minAttendanceMinutes =
         options.minAttendanceMinutes ?? SAFE_MIN_ATTENDANCE_MINUTES;
-    const cycleCost = options.cycleCost ?? DEFAULT_CYCLE_COST;
-    const anchorDate = options.anchorDate || DEFAULT_ANCHOR_DATE;
+    const cycleCost = options.cycleCost;
+    const anchorDate = options.anchorDate;
     const discountPerVisit =
         options.discountPerVisit ?? DEFAULT_DISCOUNT_PER_VISIT;
     const cycleLimit = options.cycleLimit ?? DEFAULT_CYCLE_LIMIT;
+
+    if (!anchorDate) {
+        throw new Error('options.anchorDate is required for parsePdfBuffer');
+    }
+    if (
+        cycleCost === undefined ||
+        cycleCost === null ||
+        Number.isNaN(Number(cycleCost))
+    ) {
+        throw new Error('options.cycleCost is required for parsePdfBuffer');
+    }
 
     const parser = new PDFParse({ data: buffer });
     const parsedTextResult = await parser.getText();

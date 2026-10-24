@@ -187,40 +187,84 @@
                 <section id="pdf-hero" class="hero-section">
                     <h1 class="hero-title">Gym Check-in Report</h1>
                     <p class="hero-subtitle">
-                        Upload your check-in PDF to view attendance and
-                        discounts.
+                        Mark the days you trained, then upload your PDF to verify your gym attendance and discount charges.
                     </p>
                 </section>
 
-                <!-- PDF Dropzone Card -->
-                <div id="dropzone-card" class="card dropzone-card">
-                    <div id="pdf-dropzone" class="dropzone" tabindex="0">
-                        <input
-                            type="file"
-                            id="pdf-file-input"
-                            accept=".pdf,application/pdf"
-                            class="file-input" />
-                        <div class="dropzone-content">
-                            <div class="dropzone-icon">📄</div>
-                            <h3 class="dropzone-title">Upload Check-in PDF</h3>
-                            <p class="dropzone-desc">
-                                Drag & drop or
-                                <span class="browse-link">browse</span>
-                            </p>
+                <div id="upload-flow-container" class="upload-flow-container">
+                    <!-- Step 1: Mark Days Card -->
+                    <div id="step-mark-days-card" class="card step-card">
+                        <div class="step-card-header">
+                            <div class="step-badge">Step 1</div>
+                            <div class="step-header-text">
+                                <h2 class="step-title">Mark your gym visits</h2>
+                                <p class="step-desc">Select the days you trained in the last 3 billing cycles.</p>
+                            </div>
                         </div>
+                        <div id="select-calendar-host" class="calendar-host"></div>
                     </div>
 
-                    <div id="upload-status" class="upload-status hidden">
-                        <div class="loader"></div>
-                        <p id="upload-status-text">
-                            Processing check-in records...
-                        </p>
+                    <!-- Step 2: Upload PDF Card -->
+                    <div id="dropzone-card" class="card step-card dropzone-card">
+                        <div class="step-card-header">
+                            <div class="step-badge">Step 2</div>
+                            <div class="step-header-text">
+                                <h2 class="step-title">Upload Check-in PDF</h2>
+                                <p class="step-desc">Exported check-in history from your gym app.</p>
+                            </div>
+                        </div>
+                        <div id="pdf-dropzone" class="dropzone" tabindex="0">
+                            <input
+                                type="file"
+                                id="pdf-file-input"
+                                accept=".pdf,application/pdf"
+                                class="file-input" />
+                            <div class="dropzone-content">
+                                <div class="dropzone-icon">📄</div>
+                                <h3 class="dropzone-title">Upload Check-in PDF</h3>
+                                <p class="dropzone-desc">
+                                    Drag & drop or
+                                    <span class="browse-link">browse</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div id="upload-status" class="upload-status hidden">
+                            <div class="loader"></div>
+                            <p id="upload-status-text">
+                                Processing check-in records...
+                            </p>
+                        </div>
+                        <div id="upload-error" class="error-msg hidden"></div>
                     </div>
-                    <div id="upload-error" class="error-msg hidden"></div>
                 </div>
 
                 <!-- Report Container (injected when processed) -->
                 <section id="report-container" class="report-section hidden">
+                    <!-- Verification Summary Section (Shown when PDF is parsed) -->
+                    <div id="verification-section" class="verification-section hidden">
+                        <!-- Verification Summary Card -->
+                        <div id="verification-card" class="card verification-card">
+                            <!-- Injected dynamically: Ring, stats, bank charge comparison, filter chips -->
+                        </div>
+
+                        <!-- Verification Calendar Card -->
+                        <div id="verification-calendar-card" class="card verification-calendar-card">
+                            <div class="verify-cal-header">
+                                <div>
+                                    <h3 class="verify-cal-title">Attendance Comparison Calendar</h3>
+                                    <p class="verify-cal-desc">Tap any day to see details or adjust marks</p>
+                                </div>
+                                <div class="verify-cal-actions">
+                                    <button type="button" id="edit-marked-days-btn" class="btn-text">
+                                        ✏️ Edit My Marked Days
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="verify-calendar-host" class="calendar-host"></div>
+                        </div>
+                    </div>
+
                     <!-- Cycles Toolbar -->
                     <div class="cycles-toolbar">
                         <div>
@@ -403,7 +447,7 @@
                                     name="cycleCost"
                                     step="0.01"
                                     min="0"
-                                    placeholder="60.80"
+                                    placeholder="e.g. 60.80"
                                     required />
                                 <p class="input-help">
                                     Base cost per cycle before workout discounts
@@ -455,7 +499,7 @@
 
         <div id="toast" class="toast hidden"></div>
 
-        <script src="app.js"></script>
+        <script type="module" src="app.js"></script>
         <script>
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker
