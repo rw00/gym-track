@@ -1440,7 +1440,7 @@ input[type='date'] {
 .cal-day {
     position: relative;
     aspect-ratio: 1;
-    min-height: 40px;
+    min-width: 0;
     border-radius: var(--radius-sm);
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid transparent;
